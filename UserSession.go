@@ -11,19 +11,18 @@ import (
 	"unicode/utf8"
 )
 
-//UserSession contains all data from ./JSON/config.json
+//UserSession содержит все данные для авторизации пользователя
 type UserSession struct {
 	APIKey      string `json:"API_KEY"`
 	Destination string `json:"Destination"`
 }
 
-//Init - config parsing
+//Init парсит файл ./JSON/config.json
 func (p *UserSession) Init() error {
-	//Case config.json does not exist
+	//В случае отсутствия файла - кидаем ошибку
 	if _, err := os.Stat("./JSON/config.json"); os.IsNotExist(err) {
 		return errors.New("File 'config.json' doesnt exist (UserSession.Init())")
 	}
-	//Another case
 	data, err := ioutil.ReadFile("./JSON/config.json")
 	if err != nil {
 		return errors.New("Error reading file (UserSession.Init())")
@@ -37,7 +36,6 @@ func (p *UserSession) Init() error {
 
 //TestConnection пытается получить на основе информации UserSession данные.
 //Функция пытается подключится через http://api_key:<p.APIKey>@<Destination>/api/dashboards/home/
-//Ответ должен быть отличным от {"message":"Unauthorized"}
 //Возвращает ошибку, если ответ не совпал или APIKey не задан
 func (p *UserSession) TestConnection() error {
 	response, err := http.Get("http://api_key:" + p.APIKey + "@" + p.Destination + "/api/dashboards/home/")
@@ -50,9 +48,6 @@ func (p *UserSession) TestConnection() error {
 	}
 	var answer map[string]json.RawMessage
 	err = json.Unmarshal(output, &answer)
-	// if err != nil || answer["message"] != nil {
-	// 	return errors.New("Cannot recognize")
-	// }
 	if err != nil {
 		return err
 	}
@@ -62,7 +57,7 @@ func (p *UserSession) TestConnection() error {
 	return nil
 }
 
-//GetDashboardModel try to get JSONModel for dashboard with specific UID
+//GetDashboardModel пытается получить JSONModel по UID дашборда
 func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 	err := p.TestConnection()
 	if err != nil {
@@ -79,9 +74,6 @@ func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 	}
 	var answer map[string]interface{}
 	err = json.Unmarshal(output, &answer)
-	// if err != nil || answer["message"] != nil {
-	// 	return errors.New("Cannot recognize")
-	// }
 	if err != nil {
 		return nil, err
 	}
@@ -91,13 +83,16 @@ func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 	parsed := removeMetaTag(answer)
 	jsonString, err := json.MarshalIndent(parsed, "", "\t")
 	jsonString = repairJSON(jsonString)
+
+	//Создаются две папки - Backups хранит выгруженные копии JSONModel, они не должны использоваться для изменения полей
+	//						Changed хранит уже изменённые копии JSONModel, они могут быть выгружены на сервер
 	err = ioutil.WriteFile("./Changed/"+uid+".json", jsonString, 0777)
 	err = ioutil.WriteFile("./Backups/"+uid+"_backup.json", jsonString, 0777)
 	return output, nil
 }
 
-//PostDashboardModel sends all data in JSONFile.json to update JSONModel
-//Dashboard's UID already must be in json file
+//PostDashboardModel отправляет JSONModel на сервер
+//UID обновляемого дашборда уже записано в соответствующем файле
 func (p *UserSession) PostDashboardModel(JSONFile string) error {
 	//Для поста нужно удалить meta тэг
 	err := p.TestConnection()
@@ -122,6 +117,7 @@ func (p *UserSession) PostDashboardModel(JSONFile string) error {
 	return nil
 }
 
+//GetUIDList получает список UID всех дашбордов, отсекая всё, что не dash-db
 func (p *UserSession) GetUIDList() ([]string, error) {
 	err := p.TestConnection()
 	if err != nil {
@@ -155,4 +151,19 @@ func (p *UserSession) GetUIDList() ([]string, error) {
 		return nil, errors.New("Dashboards not found (UserSession.GetUIDList())")
 	}
 	return ret, nil
+}
+
+//GetMap получает map[string]interface{} для конкретной JSONModel по UID
+func (p *UserSession) GetMap(uid string) (map[string]interface{}, error) {
+	_, err := p.GetDashboardModel(uid)
+	if err != nil {
+		return nil, err
+	}
+	data, _ := ioutil.ReadFile("./Changed/" + uid + ".json")
+	var mappedData = make(map[string]interface{})
+	err = json.Unmarshal(data, &mappedData)
+	if err != nil {
+		return nil, errors.New("Cannot convert to json (UserSession.GetMap())")
+	}
+	return mappedData, nil
 }
