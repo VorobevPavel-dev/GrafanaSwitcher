@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -14,7 +15,6 @@ import (
 type UserSession struct {
 	APIKey      string `json:"API_KEY"`
 	Destination string `json:"Destination"`
-	OutputFile  string `json:"Output"`
 }
 
 //Init - config parsing
@@ -91,7 +91,7 @@ func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 	parsed := removeMetaTag(answer)
 	jsonString, err := json.MarshalIndent(parsed, "", "\t")
 	jsonString = repairJSON(jsonString)
-	err = ioutil.WriteFile(uid+".json", jsonString, 0777)
+	err = ioutil.WriteFile("./Changed/"+uid+".json", jsonString, 0777)
 	err = ioutil.WriteFile("./Backups/"+uid+"_backup.json", jsonString, 0777)
 	return output, nil
 }
@@ -120,4 +120,39 @@ func (p *UserSession) PostDashboardModel(JSONFile string) error {
 		return errors.New("Responce error (UserSession.PostDashboardModel())")
 	}
 	return nil
+}
+
+func (p *UserSession) GetUIDList() ([]string, error) {
+	err := p.TestConnection()
+	if err != nil {
+		return nil, errors.New("Connection error (UserSession.GetUIDList())")
+	}
+	response, err := http.Get("http://api_key:" + p.APIKey + "@" + p.Destination + "/api/search?folderIds=0&query=&starred=false")
+	if err != nil {
+		return nil, errors.New("Response error (UserSession.GetIUDList())")
+	}
+	output, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return nil, errors.New("Error reading JSON responce (UserSession.GetUIDList())")
+	}
+	var (
+		mappedAnswer []map[string]interface{}
+		ret          []string
+	)
+	err = json.Unmarshal(output, &mappedAnswer)
+	if err != nil {
+		fmt.Println(string(output))
+		return nil, errors.New("Incorrect json answer (UserSession.GetUIDList())")
+	}
+	for i := range mappedAnswer {
+		// fmt.Println(mappedAnswer[i]["uid"])
+		// fmt.Println("\t", mappedAnswer[i]["type"])
+		if mappedAnswer[i]["type"] == "dash-db" {
+			ret = append(ret, mappedAnswer[i]["uid"].(string))
+		}
+	}
+	if len(ret) == 0 {
+		return nil, errors.New("Dashboards not found (UserSession.GetUIDList())")
+	}
+	return ret, nil
 }

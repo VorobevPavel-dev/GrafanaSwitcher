@@ -1,7 +1,15 @@
 package main
 
+import "fmt"
+
 func main() {
 	user := UserSession{}
 	user.Init()
-	user.GetDashboardModel("000000081")
+	UIDlist, err := user.GetUIDList()
+	if err != nil {
+		fmt.Println(err)
+	}
+	for _, i := range UIDlist {
+		user.GetDashboardModel(i)
+	}
 }
