@@ -4,27 +4,26 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"unicode/utf8"
 )
 
-//UserSession позволяет
+//UserSession contains all data from ./JSON/config.json
 type UserSession struct {
 	APIKey      string `json:"API_KEY"`
 	Destination string `json:"Destination"`
 	OutputFile  string `json:"Output"`
 }
 
-//Init - Парсинг конфига
+//Init - config parsing
 func (p *UserSession) Init() error {
-	//Если файл config.json  не существует
+	//Case config.json does not exist
 	if _, err := os.Stat("./JSON/config.json"); os.IsNotExist(err) {
 		return errors.New("File 'config.json' doesnt exist (UserSession.Init())")
 	}
-	//Если конфиг существует
+	//Another case
 	data, err := ioutil.ReadFile("./JSON/config.json")
 	if err != nil {
 		return errors.New("Error reading file (UserSession.Init())")
@@ -46,7 +45,6 @@ func (p *UserSession) TestConnection() error {
 		return errors.New("Response error (UserSession.TestConnection())")
 	}
 	output, err := ioutil.ReadAll(response.Body)
-	fmt.Println(string(output))
 	if err != nil {
 		return errors.New("Reading responce error (UserSession.TestConnection())")
 	}
@@ -64,7 +62,8 @@ func (p *UserSession) TestConnection() error {
 	return nil
 }
 
-func (p *UserSession) GetDahsboardModel(uid string) ([]byte, error) {
+//GetDashboardModel try to get JSONModel for dashboard with specific UID
+func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 	err := p.TestConnection()
 	if err != nil {
 		return nil, errors.New("Connection error (UserSession.GetDashboardModel.TestConnection())")
@@ -91,10 +90,14 @@ func (p *UserSession) GetDahsboardModel(uid string) ([]byte, error) {
 	}
 	parsed := removeMetaTag(answer)
 	jsonString, err := json.MarshalIndent(parsed, "", "\t")
-	err = ioutil.WriteFile(p.OutputFile, jsonString, 0777)
+	jsonString = repairJSON(jsonString)
+	err = ioutil.WriteFile(uid+".json", jsonString, 0777)
+	err = ioutil.WriteFile("./Backups/"+uid+"_backup.json", jsonString, 0777)
 	return output, nil
 }
 
+//PostDashboardModel sends all data in JSONFile.json to update JSONModel
+//Dashboard's UID already must be in json file
 func (p *UserSession) PostDashboardModel(JSONFile string) error {
 	//Для поста нужно удалить meta тэг
 	err := p.TestConnection()
@@ -112,44 +115,9 @@ func (p *UserSession) PostDashboardModel(JSONFile string) error {
 	req.Header.Set("Authorization", "Bearer "+string(p.APIKey))
 
 	client := &http.Client{}
-	response, err := client.Do(req)
+	_, err = client.Do(req)
 	if err != nil {
 		return errors.New("Responce error (UserSession.PostDashboardModel())")
 	}
-	output, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return errors.New("Responce reading error (UserSession.PostDashboardModel())")
-	}
-	fmt.Println(string(output))
-	// command := exec.Command("curl",
-	// 	"-X", "POST",
-	// 	"--insecure",
-	// 	"-d", "@"+string(p.OutputFile),
-	// 	"-H", "\"Content-type: application/json\"",
-	// 	"-H", "\"Authorization: Bearer "+string(p.APIKey)+"\"",
-	// 	"http://"+string(p.Destination)+"/api/dashboards/db")
-	// output, err := command.Output()
-	// if err != nil {
-	// 	return err
-	// }
-	// if output != nil {
-	// 	fmt.Println(string(output))
-	// }
-	// return nil
-	// data, _ := ioutil.ReadFile("output.json")
-	// temp := string(data)
-	// fmt.Println(temp)
-	// command := exec.Command(
-	// 	"curl",
-	// 	"-X", "POST",
-	// 	"-d", temp,
-	// 	"-H", "\"Content-type: application/json\"",
-	// 	"http://api_key:eyJrIjoiYWJnRDdJMXNUTGNlbG5rNjRkVkp1ZVUwaUd2QWdlMWkiLCJuIjoic3R1ZGVudCIsImlkIjoxfQ==@carbon-view.unix.tensor.ru/api/dashboards/db")
-	// fmt.Println(command.)
-	// 	output, err := command.Output()
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(string(output))
 	return nil
 }

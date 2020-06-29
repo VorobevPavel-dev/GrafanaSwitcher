@@ -1,8 +1,7 @@
 package main
 
 func main() {
-	user := new(UserSession)
+	user := UserSession{}
 	user.Init()
-	user.PostDashboardModel("output.json")
-
+	user.GetDashboardModel("000000081")
 }

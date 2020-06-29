@@ -18,3 +18,5 @@ JSON/*
 *.bash
 *.txt
 \320\*
+*.json
+Backups/**
