@@ -17,13 +17,13 @@ type UserSession struct {
 	Destination string `json:"Destination"`
 }
 
-//Init парсит файл ./JSON/config.json
+//Init парсит файл config.json
 func (p *UserSession) Init() error {
 	//В случае отсутствия файла - кидаем ошибку
-	if _, err := os.Stat("./JSON/config.json"); os.IsNotExist(err) {
+	if _, err := os.Stat("config.json"); os.IsNotExist(err) {
 		return errors.New("File 'config.json' doesnt exist (UserSession.Init())")
 	}
-	data, err := ioutil.ReadFile("./JSON/config.json")
+	data, err := ioutil.ReadFile("config.json")
 	if err != nil {
 		return errors.New("Error reading file (UserSession.Init())")
 	}
@@ -86,13 +86,37 @@ func (p *UserSession) GetDashboardModel(uid string) ([]byte, error) {
 
 	//Создаются две папки - Backups хранит выгруженные копии JSONModel, они не должны использоваться для изменения полей
 	//						Changed хранит уже изменённые копии JSONModel, они могут быть выгружены на сервер
-	err = ioutil.WriteFile("./Changed/"+uid+".json", jsonString, 0777)
 	err = ioutil.WriteFile("./Backups/"+uid+"_backup.json", jsonString, 0777)
+	// err = ioutil.WriteFile("./Backups/"+uid+"_backup.json", jsonString, 0777)
 	return output, nil
 }
 
 //PostDashboardModel отправляет JSONModel на сервер
 //UID обновляемого дашборда уже записано в соответствующем файле
+// func (p *UserSession) PostDashboardModel(uid string) error {
+// 	//Для поста нужно удалить meta тэг
+// 	err := p.TestConnection()
+// 	if err != nil {
+// 		return errors.New("Connection error (UserSession.PostDashboardModel())")
+// 	}
+// 	url := "http://" + string(p.Destination) + "/api/dashboards/db"
+// 	newValues, err := ioutil.ReadFile("./Changed/" + string(uid) + ".json")
+// 	if err != nil {
+// 		return errors.New("File not found. Probably it hasnt been changed (UserSession.PostDashboardModel())")
+// 	}
+// 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(newValues))
+// 	req.Header.Set("Content-Type", "application/json")
+// 	req.Header.Set("Content-Length", string(utf8.RuneCountInString(string(newValues))))
+// 	req.Header.Set("Authorization", "Bearer "+string(p.APIKey))
+
+// 	client := &http.Client{}
+// 	_, err = client.Do(req)
+// 	if err != nil {
+// 		return errors.New("Responce error (UserSession.PostDashboardModel())")
+// 	}
+// 	return nil
+// }
+
 func (p *UserSession) PostDashboardModel(JSONFile string) error {
 	//Для поста нужно удалить meta тэг
 	err := p.TestConnection()
@@ -123,6 +147,8 @@ func (p *UserSession) GetUIDList() ([]string, error) {
 	if err != nil {
 		return nil, errors.New("Connection error (UserSession.GetUIDList())")
 	}
+
+	//В хорошем случае мы получаем json структуру, которая содержит всю иинформацию о дашбордах и папках
 	response, err := http.Get("http://api_key:" + p.APIKey + "@" + p.Destination + "/api/search?folderIds=0&query=&starred=false")
 	if err != nil {
 		return nil, errors.New("Response error (UserSession.GetIUDList())")
@@ -141,8 +167,6 @@ func (p *UserSession) GetUIDList() ([]string, error) {
 		return nil, errors.New("Incorrect json answer (UserSession.GetUIDList())")
 	}
 	for i := range mappedAnswer {
-		// fmt.Println(mappedAnswer[i]["uid"])
-		// fmt.Println("\t", mappedAnswer[i]["type"])
 		if mappedAnswer[i]["type"] == "dash-db" {
 			ret = append(ret, mappedAnswer[i]["uid"].(string))
 		}
@@ -153,7 +177,8 @@ func (p *UserSession) GetUIDList() ([]string, error) {
 	return ret, nil
 }
 
-//GetMap получает map[string]interface{} для конкретной JSONModel по UID
+//GetMap получает map[string]interface{} для конкретной JSONModel по UID.
+//Также делает бэкап файла
 func (p *UserSession) GetMap(uid string) (map[string]interface{}, error) {
 	_, err := p.GetDashboardModel(uid)
 	if err != nil {
@@ -166,4 +191,70 @@ func (p *UserSession) GetMap(uid string) (map[string]interface{}, error) {
 		return nil, errors.New("Cannot convert to json (UserSession.GetMap())")
 	}
 	return mappedData, nil
+}
+
+//ChangeTag берёт соответствющий дашборд, делает бэкап в ./Backups и меняет файл.
+//Изменённая версия попадает в папку Change с именем <uid>.json.
+//Если дашборд уже получен в ./Changed, то берётся локальный файл
+//Возвращает количество изменений при удачной попытке
+//TODO: нормально описать ошибки
+//TODO: удаление файла ./Changed при ошибке
+func (p *UserSession) ChangeTag(uid, tagName string, newValue interface{}) (int, error) {
+	//Сначала проверяем подключение
+	err := p.TestConnection()
+	if err != nil {
+		return 0, errors.New("Connection error (UserSession.ChangeTag())")
+	}
+	//Получаем JSONModel в Backup
+	_, err = p.GetDashboardModel(uid)
+	if err != nil {
+		return 0, errors.New("Cannot find dashboard (UserSession.ChangeTag())")
+	}
+	//Получаем информацию от файла и помещаем в карту
+	var mainMap = make(map[string]interface{})
+	data, _ := ioutil.ReadFile("./Backups/" + uid + "_backup.json")
+	json.Unmarshal(data, &mainMap)
+
+	//Меняем тэг через вспомогательную функцию
+	mainMap, err = changeTag(mainMap, tagName, newValue)
+	if err != nil {
+		return 0, err
+	}
+
+	//Записываем изменения в ./Changed
+	err = mapToFile("./Changed/"+uid+".json", mainMap)
+	if err != nil {
+		return 0, err
+	}
+
+	//Отправляем изменения на сервер
+	err = p.PostDashboardModel("./Changed/" + uid + ".json")
+	if err != nil {
+		return 0, err
+	}
+	return len(routes), nil
+}
+
+func (p *UserSession) Recover(uid string) error {
+	err := p.TestConnection()
+	if err != nil {
+		return errors.New("Connection error (UserSession.PostDashboardModel())")
+	}
+	url := "http://" + string(p.Destination) + "/api/dashboards/db"
+	// fmt.Println("./Backups/" + string(uid) + "_backup.json")
+	newValues, err := ioutil.ReadFile("./Backups/" + string(uid) + "_backup.json")
+	if err != nil {
+		return errors.New("File not found. Probably it hasnt been changed (UserSession.PostDashboardModel())")
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(newValues))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Length", string(utf8.RuneCountInString(string(newValues))))
+	req.Header.Set("Authorization", "Bearer "+string(p.APIKey))
+
+	client := &http.Client{}
+	_, err = client.Do(req)
+	if err != nil {
+		return errors.New("Responce error (UserSession.PostDashboardModel())")
+	}
+	return nil
 }

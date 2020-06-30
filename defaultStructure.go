@@ -13,7 +13,7 @@ type JSONModel struct {
 		} `json:"list"`
 	} `json:"annotations"`
 	editable     bool `json:"editable"`
-	gnetId       int  `json:"gnetId"`
+	gnetID       int  `json:"gnetId"`
 	graphTooltip int  `json:"graphTooltip"`
 	hideControls bool `json:"hideControls"`
 	id           int  `json:"id"`
@@ -36,7 +36,7 @@ type JSONModel struct {
 			editable         bool     `json:"editable"`
 			Error            bool     `json:"error"`
 			format           string   `json:"format"`
-			graphId          string   `json:"graphId"`
+			graphID          string   `json:"graphId"`
 			hideTimeOverride bool     `json:"hideTimeOverride"`
 			id               int      `json:"id"`
 			init             struct {
@@ -44,7 +44,7 @@ type JSONModel struct {
 		} `json:"panels"`
 		repeat          int    `json:"repeat"`
 		repeatIteration int    `json:"repeatIteration"`
-		repeatRowId     int    `json:"repeatRowId"`
+		repeatRowID     int    `json:"repeatRowId"`
 		showTitle       bool   `json:"showTitle"`
 		title           string `json:"title"`
 		titleSize       string `json:"titleSize"`
