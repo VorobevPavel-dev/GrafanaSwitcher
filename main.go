@@ -31,12 +31,7 @@ func init() {
 func main() {
 	user := new(UserSession)
 	user.Init()
-	_, err := user.GetDashboardModel("lwg_i7MMk")
-	if err != nil {
-		fmt.Println(err)
-	}
-	_, err = user.ChangeTag("lwg_i7MMk", `sbis3mon.prod.linux.memory.ins-db2.interval-28sec.mem.ram.used.avg`, "semi-dark-orange")
-	if err != nil {
-		fmt.Println(err)
-	}
+	dashboard := new(Dashboard)
+	dashboard.Init("lwg_i7MMk")
+	dashboard, _ = dashboard.Restore(user)
 }

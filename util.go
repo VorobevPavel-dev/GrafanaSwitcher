@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"strconv"
@@ -76,7 +77,6 @@ func getRoutes(json map[string]interface{}, currentPath, tagToFind string) {
 	}
 }
 
-//TODO: нормально описать ошибку
 //changeTag меняет тэги в карте на основе путей до этих тэгов
 func changeTag(jsonMap map[string]interface{}, tagName string, newValue interface{}) (map[string]interface{}, error) {
 	workMap := func(shell map[string]interface{}) map[string]interface{} {
@@ -84,50 +84,44 @@ func changeTag(jsonMap map[string]interface{}, tagName string, newValue interfac
 	}(jsonMap)
 	byteJSON, err := json.Marshal(jsonMap)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Cannot convert to json (util.changeTag())")
 	}
-	err = ioutil.WriteFile("output1.json", byteJSON, 0777)
 	stringJSON := string(byteJSON)
-	if err != nil {
-		return nil, err
-	}
 	getRoutes(workMap, "dashboard", tagName)
 	for _, i := range routes {
-		// fmt.Println(i)
 		stringJSON, err = sjson.Set(stringJSON, i, newValue)
 		if err != nil {
-			panic(err)
+			return nil, errors.New("Cannot change tag (util.changeTag())")
 		}
 	}
 
 	jsonMap, err = stringToMap(stringJSON)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Cannot convert to map (util.changeTag())")
 	}
 	return jsonMap, nil
 }
 
-//TODO: нормально описать ошибку
 //stringToMap превращает JSON строку в карту
 func stringToMap(jsonString string) (map[string]interface{}, error) {
 	var result = make(map[string]interface{})
 	err := json.Unmarshal([]byte(jsonString), &result)
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Cannot unmarshall (util.stringToMap())")
 	}
 	return result, nil
 }
 
-//TODO: нормально описать ошибку
 //mapToFile ползволяет записать json карту в файл
 func mapToFile(filename string, jsonMap map[string]interface{}) error {
 	data, err := json.MarshalIndent(jsonMap, "", "\t")
 	if err != nil {
-		return err
+		return errors.New("Cannot caonvert to json (util.mapToFile())")
 	}
+	data = repairJSON(data)
 	err = ioutil.WriteFile(filename, data, 0777)
 	if err != nil {
-		return err
+		return errors.New("Cannot write to file (util.mapToFile())")
 	}
 	return nil
 }

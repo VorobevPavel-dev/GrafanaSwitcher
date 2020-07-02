@@ -197,8 +197,6 @@ func (p *UserSession) GetMap(uid string) (map[string]interface{}, error) {
 //Изменённая версия попадает в папку Change с именем <uid>.json.
 //Если дашборд уже получен в ./Changed, то берётся локальный файл
 //Возвращает количество изменений при удачной попытке
-//TODO: нормально описать ошибки
-//TODO: удаление файла ./Changed при ошибке
 func (p *UserSession) ChangeTag(uid, tagName string, newValue interface{}) (int, error) {
 	//Сначала проверяем подключение
 	err := p.TestConnection()

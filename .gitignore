@@ -20,3 +20,5 @@ JSON/*
 \320\*
 *.json
 Backups/**
+Changed/**
+tagWorker.go
