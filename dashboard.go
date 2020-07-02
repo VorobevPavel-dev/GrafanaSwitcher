@@ -34,6 +34,7 @@ func (d *Dashboard) Init(uid string) {
 
 	//Если файл уже был получен (есть копия в Backups), то получаем из него карту и ставим как MainMap
 	//Также ищем id и version
+	//TODO: обработать некорректный json файл
 	if _, err := os.Stat(d.Backup); !os.IsNotExist(err) {
 		var data = make(map[string]interface{})
 		text, _ := ioutil.ReadFile(d.Backup)
@@ -105,6 +106,7 @@ func (d *Dashboard) Get(p *UserSession) error {
 
 //Post отправляет изменения на сервер.
 //UID дашборда, который обновится, уже записан в json файле d.Changed
+//TODO: обработка неналичия файла p.Changed
 func (d *Dashboard) Post(p *UserSession) error {
 	//Проверяем соединение через UserSession.ApiKey
 	err := p.TestConnection()
