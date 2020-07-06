@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"strconv"
+	"strings"
 
 	"github.com/tidwall/sjson"
 )
@@ -75,10 +76,22 @@ func getRoutes(json map[string]interface{}, currentPath, tagToFind string) {
 
 		}
 	}
+	// for i := range routes {
+	// 	fmt.Println(i)
+	// }
 }
 
 //changeTag меняет тэги в карте на основе путей до этих тэгов
 func changeTag(jsonMap map[string]interface{}, tagName string, newValue interface{}) (map[string]interface{}, error) {
+	//Случай, если тэг без точек - просто выполняем функцию
+	//В противном случае надо изменить карту и в конце поменять все иероглифы на точки
+	if strings.Contains(tagName, ".") {
+		toFix, _ := mapToString(jsonMap)
+		toFix = strings.ReplaceAll(toFix, ".", "語")
+		// fmt.Println(toFix)
+		jsonMap, _ = stringToMap(toFix)
+		tagName = strings.ReplaceAll(tagName, ".", "語")
+	}
 	workMap := func(shell map[string]interface{}) map[string]interface{} {
 		return shell["dashboard"].(map[string]interface{})
 	}(jsonMap)
@@ -87,7 +100,13 @@ func changeTag(jsonMap map[string]interface{}, tagName string, newValue interfac
 		return nil, errors.New("Cannot convert to json (util.changeTag())")
 	}
 	stringJSON := string(byteJSON)
+	// fmt.Println(tagName)
+	// fmt.Println(newValue)
+	// fmt.Println(jsonMap)
 	getRoutes(workMap, "dashboard", tagName)
+	if len(routes) == 0 {
+		return nil, errors.New("Tag " + tagName + " not found in this JSONModel")
+	}
 	for _, i := range routes {
 		stringJSON, err = sjson.Set(stringJSON, i, newValue)
 		if err != nil {
@@ -95,7 +114,11 @@ func changeTag(jsonMap map[string]interface{}, tagName string, newValue interfac
 		}
 	}
 
+	if strings.Contains(stringJSON, "語") {
+		stringJSON = strings.ReplaceAll(stringJSON, "語", ".")
+	}
 	jsonMap, err = stringToMap(stringJSON)
+
 	if err != nil {
 		return nil, errors.New("Cannot convert to map (util.changeTag())")
 	}
@@ -110,6 +133,15 @@ func stringToMap(jsonString string) (map[string]interface{}, error) {
 		return nil, errors.New("Cannot unmarshall (util.stringToMap())")
 	}
 	return result, nil
+}
+
+//mapToString превращает карту в JSON
+func mapToString(tag map[string]interface{}) (string, error) {
+	result, err := json.MarshalIndent(tag, "", "\t")
+	if err != nil {
+		return "", errors.New("Cannot convert to string (mapToString())")
+	}
+	return string(result), nil
 }
 
 //mapToFile ползволяет записать json карту в файл

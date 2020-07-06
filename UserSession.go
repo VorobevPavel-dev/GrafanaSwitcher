@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -77,7 +76,7 @@ func (p *UserSession) GetUIDList() ([]string, error) {
 	)
 	err = json.Unmarshal(output, &mappedAnswer)
 	if err != nil {
-		fmt.Println(string(output))
+		// fmt.Println(string(output))
 		return nil, errors.New("Incorrect json answer (UserSession.GetUIDList())")
 	}
 	for i := range mappedAnswer {

@@ -22,6 +22,7 @@ type Dashboard struct {
 	Version int
 	Backup  string
 	Changed string
+	Text    string
 	MainMap map[string]interface{}
 }
 
@@ -34,11 +35,11 @@ func (d *Dashboard) Init(uid string) {
 
 	//Если файл уже был получен (есть копия в Backups), то получаем из него карту и ставим как MainMap
 	//Также ищем id и version
-	//TODO: обработать некорректный json файл
 	if _, err := os.Stat(d.Backup); !os.IsNotExist(err) {
 		var data = make(map[string]interface{})
 		text, _ := ioutil.ReadFile(d.Backup)
-		json.Unmarshal(text, &data)
+		d.Text = string(text)
+		json.Unmarshal([]byte(d.Text), &data)
 		d.MainMap = data
 		innerMap := d.MainMap["dashboard"].(map[string]interface{})
 		tempID := innerMap["id"].(float64)
@@ -46,6 +47,7 @@ func (d *Dashboard) Init(uid string) {
 		tempVersion := innerMap["version"].(float64)
 		d.Version = int(tempVersion)
 	}
+	// fmt.Println(d.Text)
 }
 
 //Get получает dashboard на основе данных из config.json и uid внутри структуры.
@@ -74,6 +76,9 @@ func (d *Dashboard) Get(p *UserSession) error {
 	var answer map[string]interface{}
 	err = json.Unmarshal(output, &answer)
 	d.MainMap = answer
+	// fmt.Println(string(output))
+	// fmt.Println(answer)
+	// fmt.Println(d.MainMap)
 
 	//Ищем версию и id для json model
 	innerMap := d.MainMap["dashboard"].(map[string]interface{})
@@ -106,7 +111,6 @@ func (d *Dashboard) Get(p *UserSession) error {
 
 //Post отправляет изменения на сервер.
 //UID дашборда, который обновится, уже записан в json файле d.Changed
-//TODO: обработка неналичия файла p.Changed
 func (d *Dashboard) Post(p *UserSession) error {
 	//Проверяем соединение через UserSession.ApiKey
 	err := p.TestConnection()
@@ -121,6 +125,9 @@ func (d *Dashboard) Post(p *UserSession) error {
 		return errors.New("Error reading file(Dashboard.Post())\nProbably there is no Changed copy of this dashboard")
 	}
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(newValues))
+	if err != nil {
+		return err
+	}
 
 	//Добавляем заголовки
 	req.Header.Set("Content-Type", "application/json")
