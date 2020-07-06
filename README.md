@@ -13,9 +13,8 @@
 
 # Установка
 ```bash
-mkdir GrafanaSwitсher
-cd GrafanaSwitcher
 git clone https://github.com/VorobevPavel-dev/GrafanaSwitcher.git
+cd GrafanaSwitcher
 go build
 ```
 
