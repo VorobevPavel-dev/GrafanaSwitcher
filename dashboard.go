@@ -225,3 +225,54 @@ func (d *Dashboard) Print() {
 	fmt.Println("\tBackup file:", d.Backup)
 	fmt.Println("\tChanged version:", d.Changed)
 }
+
+//InsertPanels inserts all from panels into the Dashboard.MainMap
+func (d *Dashboard) InsertPanels(panels []Panel) error {
+	// panelsByte, err := json.MarshalIndent(panels, "", "\t")
+	// if err != nil {
+	// 	return errors.New("Cannot convert panels array to JSON (Dashboard.InsertPanels())")
+	// }
+	innerMap, ok := d.MainMap["dashboard"].(map[string]interface{})
+	if !ok {
+		return errors.New("Cannot convert Dashboard.MainMap to map[string]interface{} (Dashboard.InsertPanels())")
+	}
+	innerMap["panels"] = panels
+	return nil
+}
+
+//PrintToFile allows you to write dashboard to ./Changed file
+func (d *Dashboard) PrintToFile() error {
+	err := mapToFile(d.Changed, d.MainMap)
+	if err != nil {
+		return errors.New("Cannot write to file (Dashboard.PrintToFile())")
+	}
+	return nil
+}
+
+//GetPanels allows you to get all Panels from a current dashboard
+func (d *Dashboard) GetPanels() ([]Panel, error) {
+	var (
+		toRet []Panel
+		ok    bool
+		err   error
+	)
+	innerTag, ok := d.MainMap["dashboard"].(map[string]interface{})
+	if !ok {
+		return nil, errors.New("Cannot convert \"dashboard\" tag to a map[string]interface{} (Dashboard.GetPanels())")
+	}
+	panelsTag, ok := innerTag["panels"].([]interface{})
+	if !ok {
+		return nil, errors.New("Cannot convert \"panels\" tag to a []interface{} (Dashboard.GetPanels())")
+	}
+	for _, i := range panelsTag {
+		var tempPanel Panel
+		temp := i.(map[string]interface{})
+		currentPanel, _ := mapToString(temp)
+		err = json.Unmarshal([]byte(currentPanel), &tempPanel)
+		if err != nil {
+			return nil, errors.New("Cannot convert JSONPanel to Panel (Dashboard.GetPanels())")
+		}
+		toRet = append(toRet, tempPanel)
+	}
+	return toRet, nil
+}

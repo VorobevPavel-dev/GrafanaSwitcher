@@ -33,6 +33,9 @@ var (
 	//NewValue - новое значения для тэга
 	NewValue string
 
+	//otv - Если флаг поднят, то будет менять только target внутри panels. Несовместим с другими тэгами
+	otv string
+
 	//UID - UID дашборда
 	UID string
 )
@@ -63,18 +66,20 @@ func init() {
 	flag.BoolVar(&Post, "post", false, "If this flat is raised all changes will be posted on a server")
 	flag.BoolVar(&Get, "get-only", false, "If this flag is raised you will get a copy of JSONModel. All other flags and commangs will be ignored")
 	flag.BoolVar(&UIDList, "uids-only", false, "If this flag is raised you will get list of all UID on a server. All other flags will be ignored")
+	flag.StringVar(&otv, "OTV", "", "(Old Target Value) It works only with targets. With other tag will panic")
 	flag.Parse()
 
 	if UID == "" {
 		if !Get {
-			fmt.Println("-uid must not be empty")
-			os.Exit(1)
+			panic("-uid must not be empty")
 		}
 		if !UIDList {
-			fmt.Println("-uid must not be empty")
-			fmt.Println("Choose -get or -uids-only flag for this case")
-			os.Exit(1)
+			panic("-uid must not be empty\nChoose -get or -uids-only flag for this case")
 		}
+	}
+
+	if Tag != "" && otv != "" {
+		panic("You cannot change tag and specified targed at the same time")
 	}
 
 	if Tag != "" && NewValue == "" {
@@ -82,14 +87,12 @@ func init() {
 		var choise string
 		_, _ = fmt.Scan(&choise)
 		if choise != "y" {
-			fmt.Println("Operation aborted")
-			os.Exit(1)
+			panic("Operation aborted")
 		}
 	}
 
 	if Get && UIDList {
-		fmt.Println("Incorrect combination of flags. Check -h for help")
-		os.Exit(1)
+		panic("Incorrect combination of flags. Check -h for help")
 	}
 }
 
@@ -100,8 +103,7 @@ func main() {
 	if UIDList {
 		list, err := user.GetUIDList()
 		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+			panic(err)
 		}
 		output := ""
 		for i := range list {
@@ -113,8 +115,7 @@ func main() {
 	dashboard.Init(UID)
 	err := dashboard.Get(user)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		panic(err)
 	}
 	//Если Get поднят, то выходим из программы, так как JSONModel мы получили ранее
 	if Get {
@@ -129,16 +130,36 @@ func main() {
 		}
 		os.Exit(0)
 	} else {
-		err = dashboard.ChangeTag(Tag, NewValue)
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
+		if otv != "" {
+			if Tag != "" {
+				panic("Cannot change Target and custom tag at the same time")
+			}
+			if NewValue == "" {
+				panic("New target not specified")
+			}
+			temp, err := dashboard.GetPanels()
+			if err != nil {
+				panic(err)
+			}
+			for i := range temp {
+				for j := range temp[i].Targets {
+					if temp[i].Targets[j].Target == otv {
+						temp[i].Targets[j].Target = NewValue
+					}
+				}
+			}
+			dashboard.InsertPanels(temp)
+			dashboard.PrintToFile()
+		} else {
+			err = dashboard.ChangeTag(Tag, NewValue)
+			if err != nil {
+				panic(err)
+			}
 		}
 		if Post {
 			err = dashboard.Post(user)
 			if err != nil {
-				fmt.Println(err)
-				os.Exit(1)
+				panic(err)
 			}
 		}
 	}
